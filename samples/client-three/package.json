@@ -1,0 +1,22 @@
+{
+  "name": "client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@zhobo63/imgui-ts": "0.1.43",
+    "msgpackr": "1.10.0",
+    "three": "0.158.0"
+  },
+  "devDependencies": {
+    "@types/three": "0.158.3",
+    "typescript": "5.3.2",
+    "vite": "5.0.4",
+    "vite-tsconfig-paths": "4.2.1"
+  }
+}

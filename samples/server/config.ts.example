@@ -1,0 +1,6 @@
+export default {
+    ip: '127.0.0.1',
+    port: 4444,
+    //path: 'D:/Projects/xerogame/game/resource',
+    //path: 'G:/work/xero/client_S8_old/game/resources/.core/resources',
+};

@@ -1,0 +1,1 @@
+cls & npm outdated & cmd /k
