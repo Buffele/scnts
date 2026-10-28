@@ -1,119 +1,73 @@
-import {SeekOrigin} from './SeekOrigin';
-import {Matrix4, Quaternion, Vector2, Vector3, Vector4} from 'three';
-import { NsMatrix4, NsQuaternion, NsVector2, NsVector3, NsVector4 } from "../Common/NsMath";
+import { SeekOrigin } from './SeekOrigin';
+import { encode, decode } from 'iconv-lite';
+import { NsMatrix4, NsQuaternion, NsVector2, NsVector3, NsVector4 } from '../Common/NsMath';
 
-export class NsBinaryWriter
-{
-	handle: Buffer;
-	offset: number;
+export class NsBinaryWriter {
+    offset = 0;
+    constructor(public handle: Buffer = Buffer.alloc(0)) {}
 
-	constructor(handle: Buffer)
-	{
-		this.handle = handle;
-		this.offset = 0;
-	}
+    seek(offset: number, origin: SeekOrigin) {
+        const base = origin === SeekOrigin.Begin ? 0 : origin === SeekOrigin.Current ? this.offset :
+            origin === SeekOrigin.End ? this.handle.length : NaN;
+        const next = base + offset;
+        if (!Number.isSafeInteger(next) || next < 0) throw new RangeError('Invalid binary write offset');
+        this.offset = next;
+    }
 
-	seek(offset: number, origin: SeekOrigin)
-	{
-		if (origin == SeekOrigin.Current)
-			this.offset += offset;
-		else if (origin == SeekOrigin.Begin)
-			this.offset = offset;
-		else if (origin == SeekOrigin.End)
-			this.offset = this.handle.length + offset;
-		else
-			throw 'origin not found';
-	}
+    write(buffer: Buffer): Buffer {
+        const end = this.offset + buffer.length;
+        if (end > this.handle.length) {
+            const expanded = Buffer.alloc(end);
+            this.handle.copy(expanded);
+            this.handle = expanded;
+        }
+        buffer.copy(this.handle, this.offset);
+        this.offset = end;
+        return buffer;
+    }
 
-	write(buffer: Buffer) : Buffer
-	{
-		this.handle = Buffer.concat([ this.handle, buffer ]);
-		this.offset += buffer.length;
-		return buffer;
-	}
+    private scalar(size: number, fill: (buffer: Buffer) => void): Buffer {
+        const buffer = Buffer.alloc(size);
+        fill(buffer);
+        return this.write(buffer);
+    }
+    writeByte(value: number) { return this.scalar(1, b => b.writeUInt8(value)); }
+    writeInt16(value: number) { return this.scalar(2, b => b.writeInt16LE(value)); }
+    writeUInt16(value: number) { return this.scalar(2, b => b.writeUInt16LE(value)); }
+    writeInt32(value: number) { return this.scalar(4, b => b.writeInt32LE(value)); }
+    writeUInt32(value: number) { return this.scalar(4, b => b.writeUInt32LE(value)); }
+    writeInt64(value: bigint) { return this.scalar(8, b => b.writeBigInt64LE(value)); }
+    writeUInt64(value: bigint) { return this.scalar(8, b => b.writeBigUInt64LE(value)); }
+    writeSingle(value: number) { return this.scalar(4, b => b.writeFloatLE(value)); }
+    writeDouble(value: number) { return this.scalar(8, b => b.writeDoubleLE(value)); }
 
-	writeByte(value: number) { let buffer = new Buffer(1); buffer.writeUInt8(value); return this.write(buffer); }
-	writeInt16(value: number) { let buffer = new Buffer(2); buffer.writeUInt8(value); return this.write(buffer); }
-	writeUInt16(value: number) { let buffer = new Buffer(2); buffer.writeUInt8(value); return this.write(buffer); }
-	writeInt32(value: number) { let buffer = new Buffer(4); buffer.writeUInt8(value); return this.write(buffer); }
-	writeUInt32(value: number) { let buffer = new Buffer(4); buffer.writeUInt8(value); return this.write(buffer); }
-	writeInt64(value: bigint) { let buffer = new Buffer(8); buffer.writeBigInt64LE(value); return this.write(buffer); }
-	writeUInt64(value: bigint) { let buffer = new Buffer(8); buffer.writeBigUInt64LE(value); return this.write(buffer); }
-	writeSingle(value: number) { let buffer = new Buffer(4); buffer.writeFloatLE(value); return this.write(buffer); }
-	writeDouble(value: number) { let buffer = new Buffer(8); buffer.writeDoubleLE(value); return this.write(buffer); }
-
-	writeString(value: string)
-	{
-		let buffer = new Buffer(value.length + 1);
-		buffer.write(value, 'utf8');
-		buffer.write('\0');
-		this.write(buffer);
-	}
-
-	writeFixedString(value: string, size: number)
-	{
-		let buffer = new Buffer(size);
-		buffer.fill(0);
-		buffer.write(value, 'utf8');
-		this.write(buffer);
-	}
-
-	writeVector2(value: NsVector2)
-	{
-		let buffer = new Buffer(8);
-		buffer.writeFloatLE(value.x);
-		buffer.writeFloatLE(value.y);
-		this.write(buffer);
-	}
-
-	writeVector3(value: NsVector3)
-	{
-		let buffer = new Buffer(12);
-		buffer.writeFloatLE(value.x);
-		buffer.writeFloatLE(value.y);
-		buffer.writeFloatLE(value.z);
-		this.write(buffer);
-	}
-
-	writeVector4(value: NsVector4)
-	{
-		let buffer = new Buffer(16);
-		buffer.writeFloatLE(value.x);
-		buffer.writeFloatLE(value.y);
-		buffer.writeFloatLE(value.z);
-		buffer.writeFloatLE(value.w);
-		this.write(buffer);
-	}
-
-	writeQuaternion(value: NsQuaternion)
-	{
-		let buffer = new Buffer(16);
-		buffer.writeFloatLE(value.x);
-		buffer.writeFloatLE(value.y);
-		buffer.writeFloatLE(value.z);
-		buffer.writeFloatLE(value.w);
-		this.write(buffer);
-	}
-
-	writeMatrix4(value: NsMatrix4)
-	{
-		let buffer = new Buffer(64);
-		buffer.writeFloatLE(value.m00);
-		buffer.writeFloatLE(value.m01);
-		buffer.writeFloatLE(value.m02);
-		buffer.writeFloatLE(value.m03);
-		buffer.writeFloatLE(value.m10);
-		buffer.writeFloatLE(value.m11);
-		buffer.writeFloatLE(value.m12);
-		buffer.writeFloatLE(value.m13);
-		buffer.writeFloatLE(value.m20);
-		buffer.writeFloatLE(value.m21);
-		buffer.writeFloatLE(value.m22);
-		buffer.writeFloatLE(value.m23);
-		buffer.writeFloatLE(value.m30);
-		buffer.writeFloatLE(value.m31);
-		buffer.writeFloatLE(value.m32);
-		buffer.writeFloatLE(value.m33);
-		this.write(buffer);
-	}
+    private stringBytes(value: string): Buffer {
+        if (value.includes('\0')) throw new Error('SCN strings cannot contain NUL');
+        // The reader uses the Windows EUC-KR repertoire (CP949).
+        const bytes = encode(value, 'cp949');
+        if (decode(bytes, 'cp949') !== value) throw new Error('String cannot be encoded as EUC-KR');
+        return bytes;
+    }
+    writeString(value: string) {
+        this.write(Buffer.concat([this.stringBytes(value), Buffer.from([0])]));
+    }
+    writeFixedString(value: string, size: number) {
+        if (!Number.isSafeInteger(size) || size < 0) throw new RangeError('Invalid fixed string size');
+        const bytes = this.stringBytes(value);
+        if (bytes.length > size) throw new RangeError('String exceeds fixed field size');
+        const buffer = Buffer.alloc(size);
+        bytes.copy(buffer);
+        this.write(buffer);
+    }
+    writeVector2(value: NsVector2) { this.writeSingle(value.x); this.writeSingle(value.y); }
+    writeVector3(value: NsVector3) { this.writeVector2(value); this.writeSingle(value.z); }
+    writeVector4(value: NsVector4) { this.writeVector3(value); this.writeSingle(value.w); }
+    writeQuaternion(value: NsQuaternion) { this.writeVector4(value); }
+    writeMatrix4(value: NsMatrix4) {
+        for (const row of ['0', '1', '2', '3']) {
+            for (const column of ['0', '1', '2', '3']) {
+                this.writeSingle(value[`m${row}${column}` as keyof NsMatrix4]);
+            }
+        }
+    }
 }

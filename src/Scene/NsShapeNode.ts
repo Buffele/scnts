@@ -44,6 +44,15 @@ export class NsShapeNode extends NsSceneNode
 
 	Save(writer: NsBinaryWriter): boolean
 	{
+		if (this.version[1] < 0.1) return false;
+		if (!super.Save(writer)) return false;
+		writer.writeSingle(this.version[1]);
+		writer.writeUInt32(this.segments.length);
+		for (const segment of this.segments) {
+			writer.writeVector3(segment.start);
+			writer.writeVector3(new NsVector3(segment.end.x - segment.start.x,
+				segment.end.y - segment.start.y, segment.end.z - segment.start.z));
+		}
 		return true;
 	}
 }

@@ -94,6 +94,7 @@ export class NsGeometry extends NsSceneNode
 			this.uv.push(reader.readVector2());
 		}
 
+		this.uv2 = [];
 		if (this.renderType == NsRenderType.DiffuseLightmap)
 		{
 			this.uv2 = [];
@@ -138,7 +139,7 @@ export class NsGeometry extends NsSceneNode
 			const anim = new NsAnimation(reader.readString());
 			anim.frameCount = reader.readUInt32();
 
-			if (reader.readByte() == 1)
+			if (reader.readByte() != 0)
 			{
 				const position = reader.readVector3();
 				const rotation = reader.readQuaternion();
@@ -254,7 +255,8 @@ export class NsGeometry extends NsSceneNode
 
 	Save(writer: NsBinaryWriter): boolean
 	{
-		return super.Save(writer);
+		// Geometry serialization is not implemented; never report a partial record as saved.
+		return false;
 	}
 
 	GetAssetNames(): string[]

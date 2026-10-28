@@ -45,6 +45,7 @@ export class NsBoxNode extends NsSceneNode
 
 	Save(writer: NsBinaryWriter): boolean
 	{
+		if (this.version[1] < 0.1 || this.version[2] < 0.1) return false;
 		if (!super.Save(writer)) {
 			return false;
 		}

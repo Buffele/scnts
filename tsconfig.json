@@ -9,5 +9,7 @@
 	  "forceConsistentCasingInFileNames": true,
 	  "allowSyntheticDefaultImports": true,
 	  "noImplicitAny": false
-	}
+	},
+	"include": ["index.ts", "src/**/*.ts", "tests/**/*.ts"],
+	"exclude": ["dist", "node_modules", "samples"]
 }

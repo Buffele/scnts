@@ -56,7 +56,7 @@ m30 m31 m32 m33
 
 Matrices use the Direct3D row-vector convention with translation in the fourth row: `m30, m31, m32` (also named `_41, _42, _43`). A position transforms as `p' = p * M`. When converting to a column-vector renderer, account for that convention rather than simply copying element names. Coordinate units and scene-specific axis assumptions require asset validation.
 
-The current `readFixedString` returns an empty string if **no** zero byte occurs within the field, even if the field contains nonzero text. An empty `stringz` occupies one byte. Decimal versions below are stored as `f32`, not decimal text or integer hundredths; readers reproducing version dispatch must account for float representation.
+`readFixedString` decodes the entire field if no zero byte occurs within it. An empty `stringz` occupies one byte. Decimal versions below are stored as `f32`, not decimal text or integer hundredths; readers reproducing version dispatch must account for float representation.
 
 ## File header and node records
 
@@ -83,7 +83,7 @@ The first four bytes are a legacy-header check: a value of 1 is the **legacy roo
 | `0x14` | `u32` | `SSceneHeader::m_uiEmpty2`: reserved; no further semantics established. |
 | `0x18` | Node record[root count] | Root nodes. |
 
-The loader routes **every** leading value other than 1 through this header; that does not establish that all such values are valid. TypeScript discards the five extended header fields except for its local root count. `EMaxVersion` is `MAX_NONE=0`, `MAX_8=1`, `MAX_9=2`, `MAX_10=3`, `MAX_2009=4`, `MAX_2010=5`.
+The loader routes **every** leading value other than 1 through this header; that does not establish that all such values are valid. TypeScript retains the extended fields in `scene.header` as `maxVersion`, `sceneVersion`, `nodeCount`, `reserved1`, and `reserved2`. Legacy scenes have `header == null`. `EMaxVersion` is `MAX_NONE=0`, `MAX_8=1`, `MAX_9=2`, `MAX_10=3`, `MAX_2009=4`, `MAX_2010=5`.
 
 A normal node record is:
 
@@ -134,7 +134,7 @@ After the common payload, read `f32 version[1]`.
 | --- | --- |
 | `u64` | `nodeCount`. |
 | Wrapped child[nodeCount] | Children, each in the order shown below. |
-| `stringz` | Shared-animation scene name (`m_pStrRefAnimScene`), discarded by TypeScript. |
+| `stringz` | Shared-animation scene name (`m_pStrRefAnimScene`), stored as `reference`. |
 
 Each wrapped child is:
 
@@ -146,7 +146,7 @@ TypeSpecificPayload payload
 byte unknownSuffix       // skipped without inspection
 ```
 
-There is no reference string before the children in this branch: the equivalent shared-animation scene name follows them. TypeScript currently discards it instead of assigning `reference`. The nine-byte prefix and one-byte suffix remain unresolved. The TypeScript method for this layout is named `LoadConfused`.
+There is no reference string before the children in this branch: the equivalent shared-animation scene name follows them and is retained as `reference`. The nine-byte prefix and one-byte suffix remain unresolved. The TypeScript method for this layout is named `LoadConfused`.
 
 ## Geometry
 
@@ -214,7 +214,7 @@ The following shared blocks describe serialized bytes, even where the in-memory 
 
 | Type | Field |
 | --- | --- |
-| `u8` | `hasTransform`: zero means absent, **any nonzero byte** means present. TypeScript currently accepts only **1**. |
+| `u8` | `hasTransform`: zero means absent, **any nonzero byte** means present. |
 | `vec3` | Default/base position, if present. |
 | `quat` | Default/base rotation, if present. |
 | `vec3` | Default/base scale, if present. |
@@ -225,7 +225,7 @@ The following shared blocks describe serialized bytes, even where the in-memory 
 | `u32` | `scaleCount`, if present. |
 | ScaleKey[scaleCount] | Each: `u32 frame`, `vec3 value` (16 bytes). |
 
-Every row after the flag is conditional on the transform being present. In the current TypeScript implementation this requires `hasTransform == 1`; another nonzero value is incorrectly treated as absent and can misalign subsequent reads. A present transform block occupies `53 + 16*positionCount + 20*rotationCount + 16*scaleCount` bytes including the flag and counts.
+Every row after the flag is conditional on the transform being present. A present transform block occupies `53 + 16*positionCount + 20*rotationCount + 16*scaleCount` bytes including the flag and counts.
 
 ### Opacity track
 
@@ -349,17 +349,17 @@ Source: [NsSphereNode.ts](src/Scene/NsSphereNode.ts).
 | --- | --- |
 | CommonNode | Common payload. |
 | `f32` | `version[1]`; loading fails if `< 0.1`. |
-| `f32` | `version[2]`; must be `>= 0.1`. TypeScript currently omits this check. |
+| `f32` | `version[2]`; loading fails if `< 0.1`. |
 | `vec3` | `SSphere::m_vCenter`, currently `unk.x/y/z` in TypeScript. |
 | `f32` | `SSphere::m_fRadius`, currently `unk.w` in TypeScript. |
 
-Payload after the common fields is 24 bytes. `version[1]` belongs to `CBasicGeomNode`, `version[2]` to `CSphereNode`. The final four floats are center plus radius. Transform decomposition supplies runtime position, rotation, and scale; TypeScript only retains the raw four sphere components in `unk`.
+Payload after the common fields is 24 bytes. `version[1]` belongs to `CBasicGeomNode`, `version[2]` to `CSphereNode`. The final four floats are center plus radius. TypeScript exposes `center` and `radius` accessors backed by the legacy `unk` vector, so either representation remains usable. Transform decomposition is a separate runtime operation.
 
 ## LightNode
 
 Source: [NsLightNode.ts](src/Scene/NsLightNode.ts).
 
-After the common payload, read `f32 version[1]`. Loading fails if this value is `< 0.10`. The standard layout follows; the TypeScript parser instead selects its compatibility order when the version is `>= 0.3`. Both layouts consume another 92 bytes, for 96 bytes after the common payload including the version.
+After the common payload, read `f32 version[1]`. Loading fails if this value is `< 0.10`. Standard ordering is used at every version by default. Passing `{ lightLayout: 'alternate' }` to a scene loading entry point selects the compatibility order explicitly. Both layouts consume another 92 bytes, for 96 bytes after the common payload including the version.
 
 ### Standard light layout
 
@@ -378,7 +378,7 @@ After the common payload, read `f32 version[1]`. Loading fails if this value is 
 | `f32` | `theta`. |
 | `f32` | `phi`. |
 
-### TypeScript alternate light layout: version[1] >= 0.3
+### TypeScript alternate light layout (explicit option)
 
 | Type | Field |
 | --- | --- |
@@ -464,9 +464,9 @@ These are the names declared by the repository, not a guarantee that every viewe
 
 `filePath` is supplied by `NsBinaryReader.name`; it is **not** an on-disk SCN field. Similarly, the `{ scene, assets }` wrapper returned by the sample server is an API representation, not a file header. `mapinfo/*.ini` and `xml/map.x7` are external map metadata, not embedded SCN sections.
 
-Geometry texture references come from material strings. Groups recursively collect their children's references. `GetAssetNames()` deduplicates and sorts the collected strings **before** resolving extensions. For each reference it searches beside the SCN file in this order: `.dds`, `.png`, `.tga`, `.jpg`, `.bmp`, replacing any existing extension for the search. If none exists, it falls back to the original name. Returned entries are basenames, so directory components are removed; resolution can also make previously distinct names equal. The helper does not follow a group's `reference` file.
+Geometry texture references come from material strings. Groups recursively collect their children's references. `GetAssetNames()` deduplicates and sorts the collected strings before resolving extensions, then deduplicates and sorts the resolved result as well. For each reference it searches beside the SCN file in this order: `.dds`, `.png`, `.tga`, `.jpg`, `.bmp`, replacing any existing extension for the search. If none exists, it falls back to the original name. Returned entries are basenames, so directory components are removed. The helper does not follow a group's `reference` file.
 
-Animation keys are stored in JavaScript objects indexed by frame, so duplicate frame keys overwrite earlier entries. Morph entries are similarly indexed by vertex ID. `NsMorphKeyData.morphs` defaults to a `Map`, but the geometry loader replaces it with an object when morph data is present. Weight collections remain `Map` instances: ordinary `JSON.stringify` does not preserve their entries without a custom serialization strategy. The binary tables above retain the serialized counts and order, even where the resulting JavaScript representation does not.
+Animation keys are stored in JavaScript objects indexed by tick, so duplicate tick keys overwrite earlier entries. Morph entries are similarly indexed by vertex ID; `NsMorphKeyData.morphs` consistently uses an object. Weight collections remain `Map` instances for direct access; their `toJSON` method serializes weights as an object indexed by vertex ID. The binary tables above retain the serialized counts and order, even where the resulting JavaScript representation does not.
 
 ## Encrypted scene buffers
 
@@ -481,7 +481,7 @@ The fixed key, as hexadecimal bytes, is:
 75 75 70 75 77 75 69 6c 6f 76 65 75 77 75 73 21
 ```
 
-This is an encrypted buffer representation, not another node payload. The TypeScript reader currently performs no marker detection or decryption, so it requires plaintext SCN data. The marker test is a format heuristic, not an integrity check.
+This is an encrypted buffer representation, not another node payload. Scene loading detects and decrypts it automatically when reading from offset zero, without mutating the caller's buffer. The marker test is a format heuristic, not an integrity check.
 
 ## Compatibility and implementation limits
 
@@ -491,5 +491,5 @@ This is an encrypted buffer representation, not another node payload. The TypeSc
 - Additional scene component classes, including referenced scene groups and effect nodes, are outside this parser's eight-type factory. Their existence does not imply they share any of the payloads documented here.
 - Unknown node IDs throw. Shape, box, sphere, and light version gates can return failure. Truncated scalar reads can throw buffer bounds errors; strings scan until a zero byte or a read fails. Counts and recursion depth have no explicit limits, and references, index ranges, finite floats, and array-count consistency are not comprehensively checked.
 - The validator checks scene loading and vertex/normal count mismatch, but most other checks are placeholders. Successful parsing is not proof of correct rendering or complete format compatibility.
-- Writer methods do not provide a usable full-format encoder: groups, bones, and lights return failure; geometry writes only the common payload; shape and sphere saves return success without writing their records. Several scalar writer methods write only a byte, vector/matrix methods repeatedly write at the same offset, and string writing does not mirror EUC-KR decoding. Use reader behavior as the authority for this reference, not `Save` output.
-- No binary SCN asset corpus was used to validate these layouts. Preserve original bytes when investigating unknown fields or developing round-trip support.
+- Full scene encoding is not implemented. Group, bone, light, and geometry saves return failure without claiming a complete record. Shape, sphere, box, and bone-system saves write node payloads, excluding the outer type ID/header. Binary writer helpers use full-width little-endian values, write at the current seek position, and encode strings in EUC-KR/CP949. Strings that exceed fixed field size or cannot be represented are rejected.
+- Automated binary fixtures validate parsing, alignment, encryption, strings, and supported payload writers. No real-asset corpus or rendered viewer session was used for validation. Preserve original bytes when investigating unknown fields or developing round-trip support.

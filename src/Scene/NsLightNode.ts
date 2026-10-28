@@ -35,10 +35,7 @@ export class NsLightNode extends NsSceneNode {
 			return false;
 		}
 
-		if (this.version[1] >= 0.3) {
-			/*
-			 * 	Xero import hack, used for Jungle and Station-2 at the moment.
-			 */
+		if (reader.lightLayout === 'alternate') {
 			return this.LoadConfused(reader);
 		}
 
@@ -58,9 +55,7 @@ export class NsLightNode extends NsSceneNode {
 		return true;
 	}
 
-	/*
-	 * 	Xero import hack, used for Jungle and Station-2 at the moment.
-	 */
+	/** Explicit compatibility layout; a version alone does not select it. */
 	LoadConfused(reader: NsBinaryReader): boolean {
 		this.falloff = reader.readSingle();
 		this.diffuse = reader.readColor();

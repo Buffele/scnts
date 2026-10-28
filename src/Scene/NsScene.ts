@@ -11,6 +11,19 @@ import { NsBoneSystem } from './NsBoneSystem';
 import fs, { promises as fsAsync } from 'fs';
 import path from 'path';
 import { NsSphereNode } from './NsSphereNode';
+import { DecodeSceneBuffer } from '../IO/NsAssetCrypt';
+
+export interface NsSceneHeader {
+	maxVersion: number;
+	sceneVersion: number;
+	nodeCount: number;
+	reserved1: number;
+	reserved2: number;
+}
+
+export interface NsSceneLoadOptions {
+	lightLayout?: 'standard' | 'alternate';
+}
 
 export function CreateNodeFromType(type: NsNodeType): NsSceneNode {
 	if (type == NsNodeType.SceneGroup)
@@ -69,34 +82,44 @@ export async function TryLoadTexture(path: string): Promise<Buffer | null> {
 
 export class NsScene {
 	fileVersion: number = 1;
+	header: NsSceneHeader | null = null;
 	filePath: string = ''; // left empty if loaded from memory buffer.
 	nodes: NsSceneNode[] = [];
 
-	static LoadFromFile(path: string): NsScene | null {
+	static LoadFromBuffer(buffer: Buffer, options: NsSceneLoadOptions = {}): NsScene | null {
+		const scene = new NsScene();
+		return scene.Load(new NsBinaryReader(buffer), options) ? scene : null;
+	}
+
+	static LoadFromFile(path: string, options: NsSceneLoadOptions = {}): NsScene | null {
 		const scene = new NsScene();
 		const reader = NsBinaryReader.openFile(path);
 		if (reader == null) {
 			return null;
 		}
 
-		if (!scene.Load(reader)) {
+		if (!scene.Load(reader, options)) {
 			return null;
 		}
 
 		return scene;
 	}
 
-	Load(reader: NsBinaryReader) {
+	Load(reader: NsBinaryReader, options: NsSceneLoadOptions = {}) {
+		if (reader.offset === 0) reader.handle = DecodeSceneBuffer(reader.handle);
+		reader.lightLayout = options.lightLayout ?? reader.lightLayout;
+		this.header = null;
 		this.fileVersion = reader.readUInt32();
 		this.filePath = reader.name;
 
 		let nodeCount = 1;
 		if (this.fileVersion != 1) {
-			reader.readUInt32();
-			reader.readUInt32();
+			const maxVersion = reader.readUInt32();
+			const sceneVersion = reader.readUInt32();
 			nodeCount = reader.readUInt32();
-			reader.readUInt32();
-			reader.readUInt32();
+			const reserved1 = reader.readUInt32();
+			const reserved2 = reader.readUInt32();
+			this.header = { maxVersion, sceneVersion, nodeCount, reserved1, reserved2 };
 		}
 
 		this.nodes = [];
@@ -128,7 +151,7 @@ export class NsScene {
 			results[i] = path.basename(ResolveFilePath(directory, fileName));
 		}
 
-		return results;
+		return [...new Set(results)].sort();
 	}
 
 	/*GetAssetData(): Map<string, string> {

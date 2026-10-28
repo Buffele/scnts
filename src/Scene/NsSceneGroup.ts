@@ -8,7 +8,7 @@ import { NsNodeType } from './Constants/NsNodeType';
 export class NsSceneGroup extends NsSceneNode
 {
 	nodes: NsSceneNode[] = [];
-	reference: string = ''; // Some skirts load from a reference file for animations. Not sure what else the use is.
+	reference: string = ''; // Shared-animation scene name.
 
 	constructor(name: string = '', parent: string = '')
 	{
@@ -23,10 +23,8 @@ export class NsSceneGroup extends NsSceneNode
 		}
 
 		this.version[1] = reader.readSingle();
+		this.reference = '';
 		if (this.version[1] >= 0.3) {
-			/*
-			 * Xero import hack, remove as soon as possible
-			 */
 			return this.LoadConfused(reader);
 		}
 
@@ -49,9 +47,7 @@ export class NsSceneGroup extends NsSceneNode
 		return true;
 	}
 
-	/*
-	 * Xero import hack, remove as soon as possible.
-	 */
+	/** Wrapped child records used by group version 0.3 and newer. */
 	LoadConfused(reader: NsBinaryReader)
 	{
 		this.nodes = [];
@@ -70,7 +66,7 @@ export class NsSceneGroup extends NsSceneNode
 			this.nodes.push(node);
 		}
 
-		reader.readString(); // Global Animation? Slipped my mind.
+		this.reference = reader.readString();
 		return true;
 	}
 

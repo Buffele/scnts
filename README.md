@@ -109,6 +109,10 @@ Run it with:
 npx ts-node example.ts
 ```
 
+`NsScene.LoadFromBuffer(buffer)` also accepts in-memory scene data. Both entry points detect encrypted scene buffers automatically. Extended scene metadata is available as `scene.header`; sphere nodes expose `center` and `radius` alongside the legacy `unk` vector.
+
+Lights use the standard field order by default. For assets requiring the alternate compatibility layout, pass `{ lightLayout: 'alternate' }` as the second argument to `LoadFromFile` or `LoadFromBuffer`.
+
 `LoadFromFile` performs synchronous file reads and can throw on file or parsing errors. `GetAssetNames()` collects referenced names and resolves texture extensions relative to the scene directory, trying `.dds`, `.png`, `.tga`, `.jpg`, and `.bmp` in that order.
 
 The root `npm start` runs `index.ts`, which currently uses a hardcoded local scene path. Edit that path before using it; it does not accept a filename argument.
@@ -168,6 +172,8 @@ The validator scans `model/**/*.scn`, attempts to load each file, and reports lo
 
 ## Development notes
 
-Each package defines `npm run build`. Viewer packages also provide `npm run preview` for their production builds. The root TypeScript configuration has no explicit source include/exclude list, so its build also discovers sample TypeScript files; sample dependencies and local configuration files may be needed.
+Each package defines `npm run build`. Viewer packages also provide `npm run preview` for their production builds. The root build compiles the parser, root demo, and tests; sample apps use their own configurations and dependencies.
 
-There is no automated test script configured. Scene writing is incomplete, and the presence of binary writer helpers does not establish full `.scn` round-trip support. Format compatibility and rendering should be checked against your own assets.
+Run `npm test` for the parser build and binary-fixture tests. The fixtures cover headers, supported node types, geometry versions, animation alignment, encryption, string encoding, and binary I/O. They do not establish rendering compatibility with every asset variant.
+
+Full scene writing remains incomplete. Shape, sphere, box, and bone-system payload writers are supported; geometry, group, bone, and light saves return `false`. Binary writer helpers support little-endian values, seeking, and EUC-KR strings. Format compatibility and rendering should also be checked against your own assets.

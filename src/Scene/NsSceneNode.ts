@@ -21,7 +21,7 @@ export class NsSceneNode
     {
         this.name = reader.readString();
         this.parent = reader.readString();
-        this.version.push(reader.readSingle()); // version -- not even used in source code
+        this.version = [reader.readSingle()];
         this.matrix = reader.readMatrix4();
         return true;
     }

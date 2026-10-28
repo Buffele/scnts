@@ -8,6 +8,7 @@ export class NsBinaryReader
 	handle: Buffer;
 	offset: number;
 	name: string = ''; // May hold file path if loaded by file
+	lightLayout: 'standard' | 'alternate' = 'standard';
 
 	static openFile(path: string): NsBinaryReader | null
 	{
@@ -28,6 +29,7 @@ export class NsBinaryReader
 
 	seek(offset: number, origin: SeekOrigin)
 	{
+		const previous = this.offset;
 		if (origin == SeekOrigin.Current)
 			this.offset += offset;
 		else if (origin == SeekOrigin.Begin)
@@ -36,10 +38,17 @@ export class NsBinaryReader
 			this.offset = this.handle.length + offset;
 		else
 			throw 'origin not found';
+		if (!Number.isSafeInteger(this.offset) || this.offset < 0 || this.offset > this.handle.length) {
+			this.offset = previous;
+			throw new RangeError('Seek outside the binary buffer');
+		}
 	}
 
 	read(size: number) : Buffer
 	{
+		if (!Number.isSafeInteger(size) || size < 0 || size > this.handle.length - this.offset) {
+			throw new RangeError(`Truncated binary data at offset ${this.offset}: need ${size} bytes`);
+		}
 		const buffer = this.handle.subarray(this.offset, this.offset + size);
         this.offset += size;
         return buffer;
@@ -81,7 +90,7 @@ export class NsBinaryReader
 			chars.push(c);
 		}
 
-		return '';
+		return new TextDecoder('euc-kr').decode(new Uint8Array(chars));
 	}
 
 	readVector2()

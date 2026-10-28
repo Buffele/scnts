@@ -37,7 +37,7 @@ export class NsBone extends NsSceneNode
 			{
 				anim.frameCount = reader.readUInt32();
 
-				if (reader.readByte() == 1)
+				if (reader.readByte() != 0)
 				{
 					const position = reader.readVector3();
 					const rotation = reader.readQuaternion();
