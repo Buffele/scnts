@@ -1,6 +1,6 @@
 # scnts
 
-TypeScript tools for reading S4 League/Xero `.scn` scene files and viewing their contents in a browser. The repository contains a scene parser, a local resource API, example viewers built with Three.js and Babylon.js, and a basic asset validator.
+TypeScript tools for reading S4 League `.scn` scene files and viewing their contents in a browser. The repository contains a scene parser, a local resource API, example viewers built with Three.js and Babylon.js, and a basic asset validator.
 
 See the [SCN binary format reference](SCN_FORMAT.md) for field layouts, node types, version branches, animation data, and known format limitations.
 
